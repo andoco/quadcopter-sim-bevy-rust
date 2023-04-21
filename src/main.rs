@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_dolly::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
 
@@ -10,15 +11,36 @@ fn main() {
         .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
         .add_startup_system(setup_buildings)
+        .add_startup_system(setup_flyer)
+        .add_system(update_camera)
+        .add_system(Dolly::<MainCamera>::update_active)
         .run();
 }
 
+#[derive(Component)]
+struct MainCamera;
+
 fn setup_graphics(mut commands: Commands) {
-    // Add a camera so we can see the debug-render.
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 20.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    });
+    let start_pos = Vec3::new(0., 0., 0.);
+
+    commands.spawn((
+        MainCamera,
+        Rig::builder()
+            .with(MovableLookAt::from_position_target(start_pos))
+            .build(),
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 20.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+            ..Default::default()
+        },
+    ));
+}
+
+fn update_camera(q0: Query<(&Transform, With<Flyer>)>, mut q1: Query<&mut Rig>) {
+    let player = q0.single().0.to_owned();
+    let mut rig = q1.single_mut();
+
+    rig.driver_mut::<MovableLookAt>()
+        .set_position_target(player.translation, player.rotation);
 }
 
 fn setup_buildings(
@@ -89,4 +111,33 @@ fn setup_physics(
             })
             .insert(TransformBundle::from(Transform::from_translation(pos)));
     }
+}
+
+#[derive(Component)]
+struct Flyer;
+
+fn setup_flyer(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands
+        .spawn(RigidBody::Dynamic)
+        .insert(Collider::ball(0.5))
+        .insert(Restitution::coefficient(0.))
+        .insert(Velocity {
+            linvel: Vec3::new(0., 0., 10.),
+            ..default()
+        })
+        .insert(GravityScale(0.))
+        .insert(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere {
+                radius: 0.5,
+                ..default()
+            })),
+            material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
+            ..default()
+        })
+        .insert(TransformBundle::from(Transform::from_xyz(0., 10., -100.)))
+        .insert(Flyer);
 }
