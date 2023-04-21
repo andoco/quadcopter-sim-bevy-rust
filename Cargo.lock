@@ -1423,6 +1423,7 @@ dependencies = [
  "bevy",
  "bevy_dolly",
  "bevy_rapier3d",
+ "leafwing-input-manager",
  "rand",
 ]
 

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_dolly::prelude::*;
 use bevy_rapier3d::prelude::*;
+use leafwing_input_manager::prelude::*;
 use rand::Rng;
 
 fn main() {
@@ -8,13 +9,23 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(InputManagerPlugin::<Action>::default())
         .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
         .add_startup_system(setup_buildings)
         .add_startup_system(setup_flyer)
         .add_system(update_camera)
         .add_system(Dolly::<MainCamera>::update_active)
+        .add_system(turn)
         .run();
+}
+
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+enum Action {
+    Left,
+    Right,
+    Up,
+    Down,
 }
 
 #[derive(Component)]
@@ -125,10 +136,11 @@ fn setup_flyer(
         .spawn(RigidBody::Dynamic)
         .insert(Collider::ball(0.5))
         .insert(Restitution::coefficient(0.))
-        .insert(Velocity {
-            linvel: Vec3::new(0., 0., 10.),
-            ..default()
+        .insert(Damping {
+            linear_damping: 0.5,
+            angular_damping: 1.0,
         })
+        .insert(ExternalForce::default())
         .insert(GravityScale(0.))
         .insert(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
@@ -139,5 +151,39 @@ fn setup_flyer(
             ..default()
         })
         .insert(TransformBundle::from(Transform::from_xyz(0., 10., -100.)))
-        .insert(Flyer);
+        .insert(Flyer)
+        .insert(InputManagerBundle::<Action> {
+            // Stores "which actions are currently pressed"
+            action_state: ActionState::default(),
+            // Describes how to convert from player inputs into those actions
+            input_map: InputMap::new([
+                (KeyCode::Left, Action::Left),
+                (KeyCode::Right, Action::Right),
+                (KeyCode::Up, Action::Up),
+                (KeyCode::Down, Action::Down),
+            ]),
+        });
+}
+
+fn turn(
+    mut query: Query<(&Transform, &mut ExternalForce, &ActionState<Action>), With<Flyer>>,
+    time: Res<Time>,
+) {
+    let (tx, mut ext_force, action_state) = query.single_mut();
+
+    ext_force.force *= 1.0 - time.delta_seconds();
+    ext_force.torque *= 1.0 - time.delta_seconds();
+
+    if action_state.just_pressed(Action::Left) {
+        ext_force.torque += Vec3::new(0., 0.05, 0.);
+    }
+    if action_state.just_pressed(Action::Right) {
+        ext_force.torque += Vec3::new(0., -0.05, 0.);
+    }
+    if action_state.just_pressed(Action::Up) {
+        ext_force.force += -tx.forward() * 5.;
+    }
+    if action_state.just_pressed(Action::Down) {
+        ext_force.force += tx.forward() * 5.;
+    }
 }
