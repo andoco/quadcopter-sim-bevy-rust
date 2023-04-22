@@ -26,6 +26,7 @@ enum Action {
     Right,
     Up,
     Down,
+    Thrust,
 }
 
 #[derive(Component)]
@@ -141,7 +142,7 @@ fn setup_flyer(
             angular_damping: 1.0,
         })
         .insert(ExternalForce::default())
-        .insert(GravityScale(0.))
+        // .insert(GravityScale(0.))
         .insert(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::UVSphere {
                 radius: 0.5,
@@ -161,6 +162,7 @@ fn setup_flyer(
                 (KeyCode::Right, Action::Right),
                 (KeyCode::Up, Action::Up),
                 (KeyCode::Down, Action::Down),
+                (KeyCode::Space, Action::Thrust),
             ]),
         });
 }
@@ -185,5 +187,8 @@ fn turn(
     }
     if action_state.just_pressed(Action::Down) {
         ext_force.force += tx.forward() * 5.;
+    }
+    if action_state.just_pressed(Action::Thrust) {
+        ext_force.force += tx.up() * 5.;
     }
 }
