@@ -176,19 +176,22 @@ fn turn(
     ext_force.force *= 1.0 - time.delta_seconds();
     ext_force.torque *= 1.0 - time.delta_seconds();
 
-    if action_state.just_pressed(Action::Left) {
-        ext_force.torque += Vec3::new(0., 0.05, 0.);
+    let turn_rate = 15_f32.to_radians();
+    let accel_rate = 100_f32;
+
+    if action_state.pressed(Action::Left) {
+        ext_force.torque += Vec3::Y * turn_rate * time.delta_seconds();
     }
-    if action_state.just_pressed(Action::Right) {
-        ext_force.torque += Vec3::new(0., -0.05, 0.);
+    if action_state.pressed(Action::Right) {
+        ext_force.torque += Vec3::Y * -turn_rate * time.delta_seconds();
     }
-    if action_state.just_pressed(Action::Up) {
-        ext_force.force += -tx.forward() * 5.;
+    if action_state.pressed(Action::Up) {
+        ext_force.force += -tx.forward() * accel_rate * time.delta_seconds();
     }
-    if action_state.just_pressed(Action::Down) {
-        ext_force.force += tx.forward() * 5.;
+    if action_state.pressed(Action::Down) {
+        ext_force.force += tx.forward() * accel_rate * time.delta_seconds();
     }
-    if action_state.just_pressed(Action::Thrust) {
-        ext_force.force += tx.up() * 5.;
+    if action_state.pressed(Action::Thrust) {
+        ext_force.force += tx.up() * 50. * time.delta_seconds();
     }
 }
