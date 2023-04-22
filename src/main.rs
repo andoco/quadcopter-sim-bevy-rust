@@ -144,8 +144,9 @@ fn setup_flyer(
         .insert(ExternalForce::default())
         // .insert(GravityScale(0.))
         .insert(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::UVSphere {
-                radius: 0.5,
+            mesh: meshes.add(Mesh::from(shape::Torus {
+                radius: 0.4,
+                ring_radius: 0.1,
                 ..default()
             })),
             material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
