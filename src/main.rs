@@ -152,17 +152,5 @@ fn setup_flyer(
             ..default()
         })
         .insert(TransformBundle::from(Transform::from_xyz(0., 10., -100.)))
-        .insert(Flyer)
-        .insert(InputManagerBundle::<FlyerAction> {
-            // Stores "which actions are currently pressed"
-            action_state: ActionState::default(),
-            // Describes how to convert from player inputs into those actions
-            input_map: InputMap::new([
-                (KeyCode::Left, FlyerAction::Left),
-                (KeyCode::Right, FlyerAction::Right),
-                (KeyCode::Up, FlyerAction::Up),
-                (KeyCode::Down, FlyerAction::Down),
-                (KeyCode::Space, FlyerAction::Thrust),
-            ]),
-        });
+        .insert(Flyer);
 }

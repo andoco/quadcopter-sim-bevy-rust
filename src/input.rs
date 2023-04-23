@@ -9,15 +9,35 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(InputManagerPlugin::<FlyerAction>::default())
-            .add_system(turn);
+            .add_system(add_flyer_input)
+            .add_system(handle_flyer_input);
     }
 }
 
-fn turn(
+fn add_flyer_input(mut commands: Commands, query: Query<Entity, Added<Flyer>>) {
+    if let Some(entity) = query.get_single().ok() {
+        commands
+            .entity(entity)
+            .insert(InputManagerBundle::<FlyerAction> {
+                action_state: ActionState::default(),
+                input_map: InputMap::new([
+                    (KeyCode::Left, FlyerAction::Left),
+                    (KeyCode::Right, FlyerAction::Right),
+                    (KeyCode::Up, FlyerAction::Up),
+                    (KeyCode::Down, FlyerAction::Down),
+                    (KeyCode::Space, FlyerAction::Thrust),
+                ]),
+            });
+    }
+}
+
+fn handle_flyer_input(
     mut query: Query<(&Transform, &mut ExternalForce, &ActionState<FlyerAction>), With<Flyer>>,
     time: Res<Time>,
 ) {
-    let (tx, mut ext_force, action_state) = query.single_mut();
+    let Some((tx, mut ext_force, action_state)) = query.get_single_mut().ok() else {
+        return
+    };
 
     ext_force.force *= 1.0 - time.delta_seconds();
     ext_force.torque *= 1.0 - time.delta_seconds();
