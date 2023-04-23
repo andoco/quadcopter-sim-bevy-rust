@@ -84,14 +84,12 @@ fn setup_physics(
 ) {
     /* Create the ground. */
     commands
-        .spawn(Collider::cuboid(100.0, 0.1, 100.0))
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, -2.0, 0.0)));
-
-    /* Create the bouncing ball. */
+        .spawn(Collider::cuboid(1000.0, 0.1, 1000.0))
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.1, 0.0)));
 
     let mut rng = rand::thread_rng();
 
-    for _ in 0..20 {
+    for _ in 0..5 {
         let pos = Vec3::new(
             rng.gen_range(-50..=50) as f32,
             50.,
@@ -134,8 +132,7 @@ fn setup_flyer(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands
-        .spawn(RigidBody::Dynamic)
-        .insert(Collider::ball(0.5))
+        .spawn((RigidBody::Dynamic, Collider::cylinder(0.1, 0.5)))
         .insert(Restitution::coefficient(0.))
         .insert(Damping {
             linear_damping: 0.5,
