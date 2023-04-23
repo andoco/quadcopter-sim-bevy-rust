@@ -1,6 +1,9 @@
+mod input;
+
 use bevy::prelude::*;
 use bevy_dolly::prelude::*;
 use bevy_rapier3d::prelude::*;
+use input::InputPlugin;
 use leafwing_input_manager::prelude::*;
 use rand::Rng;
 
@@ -9,19 +12,18 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
-        .add_plugin(InputManagerPlugin::<Action>::default())
+        .add_plugin(InputPlugin)
         .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
         .add_startup_system(setup_buildings)
         .add_startup_system(setup_flyer)
         .add_system(update_camera)
         .add_system(Dolly::<MainCamera>::update_active)
-        .add_system(turn)
         .run();
 }
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
-enum Action {
+pub enum FlyerAction {
     Left,
     Right,
     Up,
@@ -151,53 +153,16 @@ fn setup_flyer(
         })
         .insert(TransformBundle::from(Transform::from_xyz(0., 10., -100.)))
         .insert(Flyer)
-        .insert(InputManagerBundle::<Action> {
+        .insert(InputManagerBundle::<FlyerAction> {
             // Stores "which actions are currently pressed"
             action_state: ActionState::default(),
             // Describes how to convert from player inputs into those actions
             input_map: InputMap::new([
-                (KeyCode::Left, Action::Left),
-                (KeyCode::Right, Action::Right),
-                (KeyCode::Up, Action::Up),
-                (KeyCode::Down, Action::Down),
-                (KeyCode::Space, Action::Thrust),
+                (KeyCode::Left, FlyerAction::Left),
+                (KeyCode::Right, FlyerAction::Right),
+                (KeyCode::Up, FlyerAction::Up),
+                (KeyCode::Down, FlyerAction::Down),
+                (KeyCode::Space, FlyerAction::Thrust),
             ]),
         });
-}
-
-fn turn(
-    mut query: Query<(&Transform, &mut ExternalForce, &ActionState<Action>), With<Flyer>>,
-    time: Res<Time>,
-) {
-    let (tx, mut ext_force, action_state) = query.single_mut();
-
-    ext_force.force *= 1.0 - time.delta_seconds();
-    ext_force.torque *= 1.0 - time.delta_seconds();
-
-    if ext_force.force.length() < 0.1 {
-        ext_force.force = Vec3::ZERO;
-    }
-    if ext_force.torque.length() < 0.1 {
-        ext_force.torque = Vec3::ZERO;
-    }
-
-    let turn_rate = 15_f32.to_radians();
-    let accel_rate = 10_f32;
-    let thrust_rate = 10_f32;
-
-    if action_state.pressed(Action::Left) {
-        ext_force.torque += Vec3::Y * turn_rate * time.delta_seconds();
-    }
-    if action_state.pressed(Action::Right) {
-        ext_force.torque += Vec3::Y * -turn_rate * time.delta_seconds();
-    }
-    if action_state.pressed(Action::Up) {
-        ext_force.force += -tx.forward() * accel_rate * time.delta_seconds();
-    }
-    if action_state.pressed(Action::Down) {
-        ext_force.force += tx.forward() * accel_rate * time.delta_seconds();
-    }
-    if action_state.pressed(Action::Thrust) {
-        ext_force.force += tx.up() * thrust_rate * time.delta_seconds();
-    }
 }
