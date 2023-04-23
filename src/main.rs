@@ -29,6 +29,8 @@ pub enum FlyerAction {
     Up,
     Down,
     Thrust,
+    Move,
+    Thrust2,
 }
 
 #[derive(Component)]
@@ -42,10 +44,7 @@ fn setup_graphics(mut commands: Commands) {
         Rig::builder()
             .with(MovableLookAt::from_position_target(start_pos))
             .build(),
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 20.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..Default::default()
-        },
+        Camera3dBundle::default(),
     ));
 }
 
@@ -135,13 +134,9 @@ fn setup_flyer(
 ) {
     commands
         .spawn((RigidBody::Dynamic, Collider::cylinder(0.1, 0.5)))
+        .insert(ReadMassProperties::default())
         .insert(Restitution::coefficient(0.))
-        .insert(Damping {
-            linear_damping: 0.5,
-            angular_damping: 1.0,
-        })
         .insert(ExternalForce::default())
-        // .insert(GravityScale(0.))
         .insert(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Torus {
                 radius: 0.4,
@@ -151,6 +146,6 @@ fn setup_flyer(
             material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
             ..default()
         })
-        .insert(TransformBundle::from(Transform::from_xyz(0., 10., -100.)))
+        .insert(TransformBundle::from(Transform::from_xyz(0., 20., 0.)))
         .insert(Flyer);
 }
