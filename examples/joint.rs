@@ -20,7 +20,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0., 0., -5.).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(0., 0., -10.).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
@@ -28,88 +28,83 @@ fn setup(
         .spawn(Collider::cuboid(1000.0, 0.1, 1000.0))
         .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.2, 0.0)));
 
+    let radius = 1.0;
+    let height = 1.0;
+
     let body = commands
         .spawn((
             RigidBody::Dynamic,
-            Collider::cylinder(0.5, 1.0),
+            Collider::cylinder(height / 2.0, radius),
             Restitution::coefficient(0.),
             PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Cylinder {
-                    radius: 1.0,
-                    height: 1.0,
+                    radius,
+                    height,
                     ..default()
                 })),
                 material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
-                transform: Transform::from_xyz(0., 0.5, 0.),
+                transform: Transform::from_xyz(0., height / 2.0, 0.),
                 ..default()
             },
         ))
         .with_children(|parent| {
             parent.spawn(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Cylinder {
-                    radius: 0.25,
-                    height: 2.0,
+                    radius: radius * 0.25,
+                    height: height * 2.0,
                     ..default()
                 })),
                 material: materials.add(Color::rgb(0.1, 0.1, 5.0).into()),
-                transform: Transform::from_xyz(0., 1.0, 0.),
+                transform: Transform::from_xyz(0., height, 0.),
                 ..default()
             });
         })
         .id();
 
-    let engine_1 = commands
-        .spawn((
-            Engine,
-            RigidBody::Dynamic,
-            Collider::cylinder(0.5, 0.25),
-            Restitution::coefficient(0.),
-            PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cylinder {
-                    radius: 0.25,
-                    height: 1.0,
-                    ..default()
-                })),
-                material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
-                transform: Transform::from_xyz(-2., 0.25, 0.),
-                ..default()
-            },
-            ImpulseJoint::new(
-                body,
-                FixedJointBuilder::new()
-                    .local_anchor1(Vec3::new(2., 0.25, 0.))
-                    .local_anchor2(Vec3::ZERO),
-            ),
-            ExternalForce::default(),
-        ))
-        .id();
+    let engine_radius = radius * 0.25;
+    let engine_height = height;
+    let offset_amount = radius + radius * 2.0;
 
-    let engine_2 = commands
-        .spawn((
-            Engine,
-            RigidBody::Dynamic,
-            Collider::cylinder(0.5, 0.25),
-            PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Cylinder {
-                    radius: 0.25,
-                    height: 1.0,
-                    ..default()
-                })),
-                material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
-                transform: Transform::from_xyz(2., 0.25, 0.),
-                ..default()
-            },
-            ImpulseJoint::new(
-                body,
-                FixedJointBuilder::new()
-                    .local_anchor1(Vec3::new(-2., 0.25, 0.))
-                    .local_anchor2(Vec3::ZERO),
-            ),
-            ExternalForce::default(),
-        ))
-        .id();
+    let offsets = vec![
+        Vec3::new(-offset_amount, 0., offset_amount),
+        Vec3::new(offset_amount, 0., offset_amount),
+        Vec3::new(-offset_amount, 0., -offset_amount),
+        Vec3::new(offset_amount, 0., -offset_amount),
+    ];
 
-    commands.entity(body).push_children(&[engine_1, engine_2]);
+    let mut engines = vec![];
+
+    for offset in offsets {
+        let engine = commands
+            .spawn((
+                Engine,
+                RigidBody::Dynamic,
+                Collider::cylinder(engine_height / 2.0, engine_radius),
+                Restitution::coefficient(0.),
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(shape::Cylinder {
+                        radius: engine_radius,
+                        height: engine_height,
+                        ..default()
+                    })),
+                    material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
+                    transform: Transform::from_translation(offset),
+                    ..default()
+                },
+                ImpulseJoint::new(
+                    body,
+                    FixedJointBuilder::new()
+                        .local_anchor1(offset)
+                        .local_anchor2(Vec3::ZERO),
+                ),
+                ExternalForce::default(),
+            ))
+            .id();
+
+        engines.push(engine);
+    }
+
+    commands.entity(body).push_children(&engines);
 }
 
 fn input(keys: Res<Input<KeyCode>>, mut engine_query: Query<&mut ExternalForce, With<Engine>>) {
