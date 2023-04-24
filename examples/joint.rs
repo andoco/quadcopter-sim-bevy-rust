@@ -44,6 +44,18 @@ fn setup(
                 ..default()
             },
         ))
+        .with_children(|parent| {
+            parent.spawn(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Cylinder {
+                    radius: 0.25,
+                    height: 2.0,
+                    ..default()
+                })),
+                material: materials.add(Color::rgb(0.1, 0.1, 5.0).into()),
+                transform: Transform::from_xyz(0., 1.0, 0.),
+                ..default()
+            });
+        })
         .id();
 
     let engine_1 = commands
@@ -97,10 +109,7 @@ fn setup(
         ))
         .id();
 
-    commands
-        .spawn(SpatialBundle::default())
-        .insert(Transform::from_xyz(0., 1., 0.))
-        .push_children(&[body, engine_1, engine_2]);
+    commands.entity(body).push_children(&[engine_1, engine_2]);
 }
 
 fn input(keys: Res<Input<KeyCode>>, mut engine_query: Query<&mut ExternalForce, With<Engine>>) {
