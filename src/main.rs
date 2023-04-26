@@ -124,7 +124,7 @@ fn setup_flyer(
                     ..default()
                 })),
                 material: materials.add(Color::rgb(0.1, 0.1, 1.0).into()),
-                transform: Transform::from_xyz(0., height / 2.0, 0.),
+                transform: Transform::from_xyz(0., height / 2.0 * 4.0, 0.),
                 ..default()
             },
             camera::Follow,
