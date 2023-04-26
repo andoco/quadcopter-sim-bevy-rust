@@ -15,7 +15,7 @@ fn main() {
         .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(CameraPlugin)
         .add_plugin(InputPlugin)
-        .add_startup_system(setup_physics)
+        .add_startup_system(setup_ground)
         .add_startup_system(setup_buildings)
         .add_startup_system(setup_flyer)
         .run();
@@ -30,6 +30,25 @@ pub enum FlyerAction {
     Thrust,
     Tilt,
     Lift,
+}
+
+fn setup_ground(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    /* Create the ground. */
+    commands
+        .spawn(Collider::cuboid(1000.0, 0.1, 1000.0))
+        .insert(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane {
+                size: 2000.,
+                ..default()
+            })),
+            material: materials.add(Color::rgb(0.1, 0.1, 0.1).into()),
+            ..default()
+        })
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.2, 0.0)));
 }
 
 fn setup_buildings(
@@ -51,60 +70,6 @@ fn setup_buildings(
                 .insert(RigidBody::Fixed)
                 .insert(Collider::cuboid(0.5, 0.5, 0.5));
         }
-    }
-}
-
-fn setup_physics(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    /* Create the ground. */
-    commands
-        .spawn(Collider::cuboid(1000.0, 0.1, 1000.0))
-        .insert(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane {
-                size: 2000.,
-                ..default()
-            })),
-            material: materials.add(Color::rgb(0.1, 0.1, 0.1).into()),
-            ..default()
-        })
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.2, 0.0)));
-
-    let mut rng = rand::thread_rng();
-
-    for _ in 0..5 {
-        let pos = Vec3::new(
-            rng.gen_range(-50..=50) as f32,
-            50.,
-            rng.gen_range(-50..=50) as f32,
-        );
-
-        let vel = Vec3::new(
-            rng.gen_range(-10..=10) as f32,
-            0.,
-            rng.gen_range(-10..=10) as f32,
-        );
-
-        commands
-            .spawn(RigidBody::Dynamic)
-            .insert(Collider::ball(0.5))
-            .insert(Restitution::coefficient(0.95))
-            .insert(Velocity {
-                linvel: vel,
-                angvel: Vec3::new(0.0, 0.0, 0.0),
-            })
-            .insert(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::UVSphere {
-                    radius: 0.5,
-                    ..default()
-                })),
-                material: materials.add(Color::rgb(0.8, 0.1, 0.1).into()),
-                // transform: Transform::from_translation(pos).with_scale(Vec3::new(5., 5., 5.)),
-                ..default()
-            })
-            .insert(TransformBundle::from(Transform::from_translation(pos)));
     }
 }
 
