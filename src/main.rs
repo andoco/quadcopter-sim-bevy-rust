@@ -1,8 +1,9 @@
+mod camera;
 mod input;
 
 use bevy::prelude::*;
-use bevy_dolly::prelude::*;
 use bevy_rapier3d::prelude::*;
+use camera::CameraPlugin;
 use input::InputPlugin;
 use leafwing_input_manager::prelude::*;
 use rand::Rng;
@@ -12,13 +13,11 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(CameraPlugin)
         .add_plugin(InputPlugin)
-        .add_startup_system(setup_graphics)
         .add_startup_system(setup_physics)
-        // .add_startup_system(setup_buildings)
+        .add_startup_system(setup_buildings)
         .add_startup_system(setup_flyer)
-        .add_system(update_camera)
-        .add_system(Dolly::<MainCamera>::update_active)
         .run();
 }
 
@@ -31,33 +30,6 @@ pub enum FlyerAction {
     Thrust,
     Tilt,
     Lift,
-}
-
-#[derive(Component)]
-struct MainCamera;
-
-fn setup_graphics(mut commands: Commands) {
-    let start_pos = Vec3::new(0., 0., 0.);
-
-    commands
-        .spawn((
-            MainCamera,
-            // Rig::builder()
-            //     .with(MovableLookAt::from_position_target(start_pos))
-            //     // .with(Arm::new(Vec3::new(0.0, 1.5, 5.)))
-            //     .build(),
-            Camera3dBundle::default(),
-        ))
-        .insert(Transform::from_xyz(0., 10., 10.).looking_at(Vec3::ZERO, Vec3::Y));
-}
-
-fn update_camera(q0: Query<&Transform, With<Flyer>>, mut q1: Query<&mut Rig>) {
-    let (Some(player), Some(mut rig)) = (q0.get_single().ok(), q1.get_single_mut().ok()) else {
-        return;
-    };
-
-    rig.driver_mut::<MovableLookAt>()
-        .set_position_target(player.translation, player.rotation);
 }
 
 fn setup_buildings(
@@ -73,7 +45,7 @@ fn setup_buildings(
                 .spawn(PbrBundle {
                     mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
                     material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-                    transform: Transform::from_translation(pos).with_scale(Vec3::new(5., 5., 5.)),
+                    transform: Transform::from_translation(pos).with_scale(Vec3::new(5., 0.1, 5.)),
                     ..default()
                 })
                 .insert(RigidBody::Fixed)
@@ -90,6 +62,14 @@ fn setup_physics(
     /* Create the ground. */
     commands
         .spawn(Collider::cuboid(1000.0, 0.1, 1000.0))
+        .insert(PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Plane {
+                size: 2000.,
+                ..default()
+            })),
+            material: materials.add(Color::rgb(0.1, 0.1, 0.1).into()),
+            ..default()
+        })
         .insert(TransformBundle::from(Transform::from_xyz(0.0, -0.2, 0.0)));
 
     let mut rng = rand::thread_rng();
@@ -182,6 +162,7 @@ fn setup_flyer(
                 transform: Transform::from_xyz(0., height / 2.0, 0.),
                 ..default()
             },
+            camera::Follow,
         ))
         .with_children(|parent| {
             parent.spawn(PbrBundle {

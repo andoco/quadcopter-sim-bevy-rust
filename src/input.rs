@@ -160,7 +160,7 @@ fn handle_quadcopter_flyer_input(
             .collect();
     }
 
-    info!("Applying thrust to engines: {:?}", engine_thrusts);
+    // info!("Applying thrust to engines: {:?}", engine_thrusts);
 
     for (Engine(engine_idx), _, global_tx, _, mut force) in engine_query.iter_mut() {
         force.force = global_tx.up() * engine_thrusts[*engine_idx as usize];

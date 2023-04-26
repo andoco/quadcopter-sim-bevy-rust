@@ -429,16 +429,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_dolly"
-version = "0.0.1"
-source = "git+https://github.com/BlackPhlox/bevy_dolly#05c0eef23bec8c61efca2920004c61f081f815d0"
-dependencies = [
- "bevy",
- "dolly",
- "leafwing-input-manager",
-]
-
-[[package]]
 name = "bevy_dylib"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1402,15 +1392,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 
 [[package]]
-name = "dolly"
-version = "0.4.1"
-source = "git+https://github.com/BlackPhlox/bevy_dolly#05c0eef23bec8c61efca2920004c61f081f815d0"
-dependencies = [
- "bevy_math",
- "bevy_transform",
-]
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1421,7 +1402,6 @@ name = "drone-sniper-bevy"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_dolly",
  "bevy_rapier3d",
  "leafwing-input-manager",
  "rand",
