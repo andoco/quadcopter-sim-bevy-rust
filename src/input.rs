@@ -136,19 +136,23 @@ fn handle_quadcopter_flyer_input(
     if action_state.pressed(FlyerAction::Tilt) {
         let axis_pair = action_state.clamped_axis_pair(FlyerAction::Tilt).unwrap();
 
-        let pitch_factor = 0.001;
-
         // Pitch forward
-        let pitch_amount = axis_pair.y().max(0.0);
-        engine_thrusts[0] -= pitch_amount * pitch_factor;
-        engine_thrusts[1] -= pitch_amount * pitch_factor;
-        engine_thrusts[2] += pitch_amount * pitch_factor;
-        engine_thrusts[3] += pitch_amount * pitch_factor;
+        if axis_pair.y().abs() >= 0.25 {
+            let pitch_factor = 0.001;
+
+            let pitch_amount = axis_pair.y().max(0.0);
+            engine_thrusts[0] -= pitch_amount * pitch_factor;
+            engine_thrusts[1] -= pitch_amount * pitch_factor;
+            engine_thrusts[2] += pitch_amount * pitch_factor;
+            engine_thrusts[3] += pitch_amount * pitch_factor;
+        }
 
         // Yaw
-        let yaw_factor = 0.01;
-        engine_thrusts[0] += axis_pair.x() * yaw_factor;
-        engine_thrusts[3] += axis_pair.x() * yaw_factor;
+        if axis_pair.x().abs() >= 0.25 {
+            let yaw_factor = 0.01;
+            engine_thrusts[0] += axis_pair.x() * yaw_factor;
+            engine_thrusts[3] += axis_pair.x() * yaw_factor;
+        }
     }
 
     if action_state.pressed(FlyerAction::Lift) {
