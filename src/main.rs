@@ -15,6 +15,7 @@ fn main() {
         .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(CameraPlugin)
         .add_plugin(InputPlugin)
+        .add_startup_system(setup_lighting)
         .add_startup_system(setup_ground)
         .add_startup_system(setup_buildings)
         .add_startup_system(setup_flyer)
@@ -30,6 +31,17 @@ pub enum FlyerAction {
     Thrust,
     Tilt,
     Lift,
+}
+
+fn setup_lighting(mut commands: Commands) {
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_rotation(Quat::from_rotation_x(-90_f32.to_radians())),
+        ..default()
+    });
 }
 
 fn setup_ground(
