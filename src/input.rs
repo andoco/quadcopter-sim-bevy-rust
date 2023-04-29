@@ -10,8 +10,9 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(InputManagerPlugin::<FlyerAction>::default())
             .add_system(add_flyer_input)
-            .add_system(handle_keyboard_input)
-            .add_system(handle_gamepad_input);
+            .add_system(update_required_engine_thrusts)
+            .add_system(handle_keyboard_input.after(update_required_engine_thrusts))
+            .add_system(handle_gamepad_input.after(update_required_engine_thrusts));
     }
 }
 
@@ -106,27 +107,24 @@ fn handle_keyboard_input(
     ext_force.torque = spin_force;
 }
 
-fn handle_gamepad_input(
-    mut query: Query<
-        (
-            &ActionState<FlyerAction>,
-            &ReadMassProperties,
-            &GlobalTransform,
-        ),
-        With<Flyer>,
-    >,
+#[derive(Component)]
+struct EngineThrusts(f32, f32, f32, f32);
+
+fn update_required_engine_thrusts(
+    mut commands: Commands,
+    mut query: Query<(Entity, &ReadMassProperties, &GlobalTransform), With<Flyer>>,
     engine_mass_query: Query<&ReadMassProperties, With<Engine>>,
-    mut engine_force_query: Query<(&Engine, &GlobalTransform, &mut ExternalForce)>,
     rapier_config: Res<RapierConfiguration>,
 ) {
-    let Some((action_state, ReadMassProperties(mass_props), global_tx)) = query.get_single_mut().ok() else {
+    let Some((entity, ReadMassProperties(mass_props), global_tx)) = query.get_single_mut().ok() else {
         return
     };
 
-    let (tilt_angle_x, _, tilt_angle_z) = global_tx
+    let pitch_angle = global_tx
         .compute_transform()
         .rotation
-        .to_euler(EulerRot::XYZ);
+        .to_euler(EulerRot::XYZ)
+        .0;
 
     let total_engine_mass = engine_mass_query
         .iter()
@@ -137,18 +135,41 @@ fn handle_gamepad_input(
     let total_mass = mass_props.mass + total_engine_mass;
 
     let min_total_thrust_required =
-        calculate_thrust_required(rapier_config.gravity.y.abs(), tilt_angle_x, total_mass).max(0.0);
+        calculate_thrust_required(rapier_config.gravity.y.abs(), pitch_angle, total_mass).max(0.0);
 
     info!(
-        "total_mass = {}, tilt_angle_x = {}, tilt_angle_z = {}, thrust_required = {}",
+        "total_mass = {}, pitch_angle = {}, thrust_required = {}",
         total_mass,
-        tilt_angle_x.to_degrees(),
-        tilt_angle_z.to_degrees(),
+        pitch_angle.to_degrees(),
         min_total_thrust_required
     );
 
+    let thrust_per_engine = min_total_thrust_required / 4.0;
+
+    commands.entity(entity).insert(EngineThrusts(
+        thrust_per_engine,
+        thrust_per_engine,
+        thrust_per_engine,
+        thrust_per_engine,
+    ));
+}
+
+fn handle_gamepad_input(
+    flyer_query: Query<(&ActionState<FlyerAction>, &EngineThrusts), With<Flyer>>,
+    mut engine_force_query: Query<(&Engine, &GlobalTransform, &mut ExternalForce)>,
+) {
+    let Some((action_state,  min_engine_thrusts)) = flyer_query.get_single().ok() else {
+        return
+    };
+
     let engine_torques = vec![1., -1., -1., 1.];
-    let mut engine_thrusts = vec![min_total_thrust_required / 4.0; 4];
+
+    let mut engine_thrusts = vec![
+        min_engine_thrusts.0,
+        min_engine_thrusts.1,
+        min_engine_thrusts.2,
+        min_engine_thrusts.3,
+    ];
 
     if action_state.pressed(FlyerAction::Tilt) {
         let axis_pair = action_state.clamped_axis_pair(FlyerAction::Tilt).unwrap();
@@ -185,9 +206,8 @@ fn handle_gamepad_input(
 
     for (Engine(engine_idx), global_tx, mut force) in engine_force_query.iter_mut() {
         let thrust = engine_thrusts[*engine_idx as usize];
-        let thrust_2 = thrust + tilt_angle_x.sin() * thrust;
-        force.force = global_tx.up() * thrust_2;
-        force.torque = global_tx.up() * thrust_2 * engine_torques[*engine_idx as usize];
+        force.force = global_tx.up() * thrust;
+        force.torque = global_tx.up() * thrust * engine_torques[*engine_idx as usize];
     }
 }
 
