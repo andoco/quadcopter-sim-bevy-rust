@@ -10,8 +10,8 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(InputManagerPlugin::<FlyerAction>::default())
             .add_system(add_flyer_input)
-            // .add_system(handle_flyer_input)
-            .add_system(handle_quadcopter_flyer_input);
+            .add_system(handle_keyboard_input)
+            .add_system(handle_gamepad_input);
     }
 }
 
@@ -30,7 +30,7 @@ fn add_flyer_input(mut commands: Commands, query: Query<Entity, Added<Flyer>>) {
     }
 }
 
-fn handle_flyer_input(
+fn handle_keyboard_input(
     mut query: Query<
         (
             &Transform,
@@ -106,7 +106,7 @@ fn handle_flyer_input(
     ext_force.torque = spin_force;
 }
 
-fn handle_quadcopter_flyer_input(
+fn handle_gamepad_input(
     mut query: Query<
         (
             &ActionState<FlyerAction>,
