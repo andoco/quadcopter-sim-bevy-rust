@@ -11,8 +11,17 @@ impl Plugin for InputPlugin {
         app.add_plugin(InputManagerPlugin::<FlyerAction>::default())
             .add_system(add_flyer_input)
             .add_system(update_required_engine_thrusts)
-            .add_system(handle_keyboard_input.after(update_required_engine_thrusts))
-            .add_system(handle_gamepad_input.after(update_required_engine_thrusts));
+            .add_system(
+                handle_keyboard_input
+                    .after(update_required_engine_thrusts)
+                    .before(apply_engine_thrusts),
+            )
+            .add_system(
+                handle_gamepad_input
+                    .after(update_required_engine_thrusts)
+                    .before(apply_engine_thrusts),
+            )
+            .add_system(apply_engine_thrusts);
     }
 }
 
@@ -110,6 +119,12 @@ fn handle_keyboard_input(
 #[derive(Component)]
 struct EngineThrusts(f32, f32, f32, f32);
 
+impl EngineThrusts {
+    fn to_array(&self) -> [f32; 4] {
+        [self.0, self.1, self.2, self.3]
+    }
+}
+
 fn update_required_engine_thrusts(
     mut commands: Commands,
     mut query: Query<(Entity, &ReadMassProperties, &GlobalTransform), With<Flyer>>,
@@ -155,21 +170,11 @@ fn update_required_engine_thrusts(
 }
 
 fn handle_gamepad_input(
-    flyer_query: Query<(&ActionState<FlyerAction>, &EngineThrusts), With<Flyer>>,
-    mut engine_force_query: Query<(&Engine, &GlobalTransform, &mut ExternalForce)>,
+    mut flyer_query: Query<(&ActionState<FlyerAction>, &mut EngineThrusts), With<Flyer>>,
 ) {
-    let Some((action_state,  min_engine_thrusts)) = flyer_query.get_single().ok() else {
+    let Some((action_state,  mut engine_thrusts)) = flyer_query.get_single_mut().ok() else {
         return
     };
-
-    let engine_torques = vec![1., -1., -1., 1.];
-
-    let mut engine_thrusts = vec![
-        min_engine_thrusts.0,
-        min_engine_thrusts.1,
-        min_engine_thrusts.2,
-        min_engine_thrusts.3,
-    ];
 
     if action_state.pressed(FlyerAction::Tilt) {
         let axis_pair = action_state.clamped_axis_pair(FlyerAction::Tilt).unwrap();
@@ -179,34 +184,49 @@ fn handle_gamepad_input(
             let pitch_factor = 0.001;
 
             let pitch_amount = axis_pair.y().max(0.0);
-            engine_thrusts[0] -= pitch_amount * pitch_factor;
-            engine_thrusts[1] -= pitch_amount * pitch_factor;
-            engine_thrusts[2] += pitch_amount * pitch_factor;
-            engine_thrusts[3] += pitch_amount * pitch_factor;
+            engine_thrusts.0 -= pitch_amount * pitch_factor;
+            engine_thrusts.1 -= pitch_amount * pitch_factor;
+            engine_thrusts.2 += pitch_amount * pitch_factor;
+            engine_thrusts.3 += pitch_amount * pitch_factor;
         }
 
         // Yaw
         if axis_pair.x().abs() >= 0.25 {
             let yaw_factor = 0.01;
-            engine_thrusts[0] += axis_pair.x() * yaw_factor;
-            engine_thrusts[3] += axis_pair.x() * yaw_factor;
+            engine_thrusts.0 += axis_pair.x() * yaw_factor;
+            engine_thrusts.3 += axis_pair.x() * yaw_factor;
         }
     }
 
     if action_state.pressed(FlyerAction::Lift) {
         let axis_pair = action_state.clamped_axis_pair(FlyerAction::Lift).unwrap();
 
-        engine_thrusts = engine_thrusts
-            .iter()
-            .map(|f| f + f * axis_pair.y())
-            .collect();
+        let f = axis_pair.y();
+
+        engine_thrusts.0 += f;
+        engine_thrusts.1 += f;
+        engine_thrusts.2 += f;
+        engine_thrusts.3 += f;
     }
+}
+
+fn apply_engine_thrusts(
+    flyer_query: Query<&EngineThrusts, With<Flyer>>,
+    mut engine_force_query: Query<(&Engine, &GlobalTransform, &mut ExternalForce)>,
+) {
+    let Ok(engine_thrusts) = flyer_query.get_single() else {
+        return;
+    };
+
+    let engine_torques = [1., -1., -1., 1.];
+
+    let engine_thrusts = engine_thrusts.to_array();
 
     info!("Applying thrust to engines: {:?}", engine_thrusts);
 
     for (Engine(engine_idx), global_tx, mut force) in engine_force_query.iter_mut() {
         let thrust = engine_thrusts[*engine_idx as usize];
-        force.force = global_tx.up() * thrust;
+        force.force = global_tx.up() * thrust; // BUG up() in wrong direction?
         force.torque = global_tx.up() * thrust * engine_torques[*engine_idx as usize];
     }
 }
