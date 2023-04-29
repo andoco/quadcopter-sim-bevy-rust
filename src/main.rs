@@ -27,7 +27,8 @@ pub enum FlyerAction {
     Right,
     Up,
     Down,
-    Thrust,
+    ThrustUp,
+    ThrustDown,
     Tilt,
     Lift,
 }

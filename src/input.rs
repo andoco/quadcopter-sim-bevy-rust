@@ -32,88 +32,17 @@ fn add_flyer_input(mut commands: Commands, query: Query<Entity, Added<Flyer>>) {
             .insert(InputManagerBundle::<FlyerAction> {
                 action_state: ActionState::default(),
                 input_map: InputMap::default()
-                    .insert(KeyCode::Space, FlyerAction::Thrust)
+                    .insert(KeyCode::Up, FlyerAction::Up)
+                    .insert(KeyCode::Down, FlyerAction::Down)
+                    .insert(KeyCode::Left, FlyerAction::Left)
+                    .insert(KeyCode::Right, FlyerAction::Right)
+                    .insert(KeyCode::A, FlyerAction::ThrustUp)
+                    .insert(KeyCode::Z, FlyerAction::ThrustDown)
                     .insert(DualAxis::left_stick(), FlyerAction::Tilt)
                     .insert(DualAxis::right_stick(), FlyerAction::Lift)
                     .build(),
             });
     }
-}
-
-fn handle_keyboard_input(
-    mut query: Query<
-        (
-            &Transform,
-            &mut ExternalForce,
-            &ReadMassProperties,
-            &ActionState<FlyerAction>,
-        ),
-        With<Flyer>,
-    >,
-    time: Res<Time>,
-    rapier_config: Res<RapierConfiguration>,
-) {
-    let Some((tx, mut ext_force, ReadMassProperties(mass_props), action_state)) = query.get_single_mut().ok() else {
-        return
-    };
-
-    // ext_force.force *= 1.0 - time.delta_seconds();
-    // ext_force.torque *= 1.0 - time.delta_seconds();
-
-    // if ext_force.force.length() < 0.1 {
-    //     ext_force.force = Vec3::ZERO;
-    // }
-    // if ext_force.torque.length() < 0.1 {
-    //     ext_force.torque = Vec3::ZERO;
-    // }
-
-    let turn_rate = 15_f32.to_radians();
-    let accel_rate = 10_f32;
-    let thrust_rate = 10_f32;
-
-    if action_state.pressed(FlyerAction::Left) {
-        ext_force.torque += Vec3::Y * turn_rate * time.delta_seconds();
-    }
-    if action_state.pressed(FlyerAction::Right) {
-        ext_force.torque += Vec3::Y * -turn_rate * time.delta_seconds();
-    }
-    if action_state.pressed(FlyerAction::Up) {
-        ext_force.force += -tx.forward() * accel_rate * time.delta_seconds();
-    }
-    if action_state.pressed(FlyerAction::Down) {
-        ext_force.force += tx.forward() * accel_rate * time.delta_seconds();
-    }
-    if action_state.pressed(FlyerAction::Thrust) {
-        ext_force.force += tx.up() * thrust_rate * time.delta_seconds();
-    }
-
-    let mut thrust_force = Vec3::ZERO;
-    let mut spin_force = Vec3::ZERO;
-
-    // if action_state.pressed(FlyerAction::Thrust2) {
-    //     let axis_pair = action_state
-    //         .clamped_axis_pair(FlyerAction::Thrust2)
-    //         .unwrap();
-
-    //     // force required to exceed gravity
-    //     let min_force_required = -rapier_config.gravity.y * mass_props.mass;
-
-    //     let thrust = axis_pair.y() * min_force_required * 2.0;
-
-    //     thrust_force = Vec3::Y * thrust;
-    // }
-
-    let mut move_force = Vec3::ZERO;
-
-    // if action_state.pressed(FlyerAction::Move) {
-    //     let axis_pair = action_state.clamped_axis_pair(FlyerAction::Move).unwrap();
-
-    //     move_force = -tx.forward() * axis_pair.y() * 5.0;
-    //     spin_force = Vec3::Y * -axis_pair.x() * 5_f32.to_radians();
-    // }
-
-    ext_force.force = thrust_force + move_force;
-    ext_force.torque = spin_force;
 }
 
 #[derive(Component)]
@@ -167,6 +96,47 @@ fn update_required_engine_thrusts(
         thrust_per_engine,
         thrust_per_engine,
     ));
+}
+
+fn handle_keyboard_input(
+    mut query: Query<(&ActionState<FlyerAction>, &mut EngineThrusts), With<Flyer>>,
+) {
+    let Ok((action_state, mut engine_thrusts)) = query.get_single_mut() else {
+        return
+    };
+
+    if action_state.pressed(FlyerAction::Left) {
+        engine_thrusts.0 *= 1.1;
+        engine_thrusts.3 *= 1.1;
+    }
+    if action_state.pressed(FlyerAction::Right) {
+        engine_thrusts.1 *= 1.1;
+        engine_thrusts.2 *= 1.1;
+    }
+    if action_state.pressed(FlyerAction::Up) {
+        engine_thrusts.0 *= 0.9;
+        engine_thrusts.1 *= 0.9;
+        engine_thrusts.2 *= 1.1;
+        engine_thrusts.3 *= 1.1;
+    }
+    if action_state.pressed(FlyerAction::Down) {
+        engine_thrusts.0 *= 1.1;
+        engine_thrusts.1 *= 1.1;
+        engine_thrusts.2 *= 0.9;
+        engine_thrusts.3 *= 0.9;
+    }
+    if action_state.pressed(FlyerAction::ThrustUp) {
+        engine_thrusts.0 *= 2.0;
+        engine_thrusts.1 *= 2.0;
+        engine_thrusts.2 *= 2.0;
+        engine_thrusts.3 *= 2.0;
+    }
+    if action_state.pressed(FlyerAction::ThrustDown) {
+        engine_thrusts.0 *= -0.25;
+        engine_thrusts.1 *= -0.25;
+        engine_thrusts.2 *= -0.25;
+        engine_thrusts.3 *= -0.25;
+    }
 }
 
 fn handle_gamepad_input(
