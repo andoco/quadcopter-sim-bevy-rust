@@ -107,31 +107,48 @@ fn handle_flyer_input(
 }
 
 fn handle_quadcopter_flyer_input(
-    mut query: Query<(&ActionState<FlyerAction>, &ReadMassProperties), With<Flyer>>,
-    mut engine_query: Query<(
-        &Engine,
-        &Transform,
-        &GlobalTransform,
-        &ReadMassProperties,
-        &mut ExternalForce,
-    )>,
+    mut query: Query<
+        (
+            &ActionState<FlyerAction>,
+            &ReadMassProperties,
+            &GlobalTransform,
+        ),
+        With<Flyer>,
+    >,
+    engine_mass_query: Query<&ReadMassProperties, With<Engine>>,
+    mut engine_force_query: Query<(&Engine, &GlobalTransform, &mut ExternalForce)>,
     rapier_config: Res<RapierConfiguration>,
 ) {
-    let Some((action_state, ReadMassProperties(mass_props))) = query.get_single_mut().ok() else {
+    let Some((action_state, ReadMassProperties(mass_props), global_tx)) = query.get_single_mut().ok() else {
         return
     };
 
-    // force required to exceed gravity
-    let body_lift_force_required = -rapier_config.gravity.y * mass_props.mass;
+    let (tilt_angle_x, _, tilt_angle_z) = global_tx
+        .compute_transform()
+        .rotation
+        .to_euler(EulerRot::XYZ);
 
-    let mut engine_thrusts = vec![0.0; 4];
+    let total_engine_mass = engine_mass_query
+        .iter()
+        .fold(0.0, |acc, ReadMassProperties(mass_props)| {
+            acc + mass_props.mass
+        });
 
-    for (Engine(engine_idx), _, _, ReadMassProperties(mass_props), _) in engine_query.iter_mut() {
-        engine_thrusts[*engine_idx as usize] =
-            body_lift_force_required / 4.0 + (-rapier_config.gravity.y * mass_props.mass);
-    }
+    let total_mass = mass_props.mass + total_engine_mass;
+
+    let min_total_thrust_required =
+        calculate_thrust_required(rapier_config.gravity.y.abs(), tilt_angle_x, total_mass).max(0.0);
+
+    info!(
+        "total_mass = {}, tilt_angle_x = {}, tilt_angle_z = {}, thrust_required = {}",
+        total_mass,
+        tilt_angle_x.to_degrees(),
+        tilt_angle_z.to_degrees(),
+        min_total_thrust_required
+    );
 
     let engine_torques = vec![1., -1., -1., 1.];
+    let mut engine_thrusts = vec![min_total_thrust_required / 4.0; 4];
 
     if action_state.pressed(FlyerAction::Tilt) {
         let axis_pair = action_state.clamped_axis_pair(FlyerAction::Tilt).unwrap();
@@ -164,12 +181,68 @@ fn handle_quadcopter_flyer_input(
             .collect();
     }
 
-    // info!("Applying thrust to engines: {:?}", engine_thrusts);
+    info!("Applying thrust to engines: {:?}", engine_thrusts);
 
-    for (Engine(engine_idx), _, global_tx, _, mut force) in engine_query.iter_mut() {
-        force.force = global_tx.up() * engine_thrusts[*engine_idx as usize];
-        force.torque = global_tx.up()
-            * engine_thrusts[*engine_idx as usize]
-            * engine_torques[*engine_idx as usize];
+    for (Engine(engine_idx), global_tx, mut force) in engine_force_query.iter_mut() {
+        let thrust = engine_thrusts[*engine_idx as usize];
+        let thrust_2 = thrust + tilt_angle_x.sin() * thrust;
+        force.force = global_tx.up() * thrust_2;
+        force.torque = global_tx.up() * thrust_2 * engine_torques[*engine_idx as usize];
+    }
+}
+
+/// Calculate the thrust force required to offset the downward force due to gravity.
+fn calculate_thrust_required(g: f32, tilt: f32, mass: f32) -> f32 {
+    // f * sin(tilt) = g * mass;
+    // f = (g * mass) / sin(tilt)
+
+    let a = 90_f32.to_radians() - tilt;
+
+    match tilt {
+        _ if tilt == 0.0 => g * mass,
+        _ => (g * mass) / a.sin(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::*;
+
+    const G: f32 = 9.81;
+    const MASS: f32 = 100.0;
+
+    #[test]
+    fn calculate_thrust_required_when_0_degrees() {
+        assert_eq!(
+            calculate_thrust_required(G, 0_f32.to_radians(), MASS),
+            G * MASS
+        );
+    }
+
+    #[test]
+    fn calculate_thrust_required_when_1_degrees() {
+        assert_relative_eq!(
+            calculate_thrust_required(G, 1_f32.to_radians(), MASS),
+            981.1494,
+            max_relative = 0.0001
+        );
+    }
+
+    #[test]
+    fn calculate_thrust_required_when_45_degrees() {
+        assert_eq!(
+            calculate_thrust_required(G, 45_f32.to_radians(), MASS),
+            1387.3436
+        );
+    }
+
+    #[test]
+    fn calculate_thrust_required_when_89_degrees() {
+        assert_relative_eq!(
+            calculate_thrust_required(G, 89_f32.to_radians(), MASS),
+            56210.0134,
+            max_relative = 0.0001
+        );
     }
 }
