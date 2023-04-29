@@ -6,7 +6,6 @@ use bevy_rapier3d::prelude::*;
 use camera::CameraPlugin;
 use input::InputPlugin;
 use leafwing_input_manager::prelude::*;
-use rand::Rng;
 
 fn main() {
     App::new()
