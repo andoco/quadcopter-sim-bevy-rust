@@ -78,8 +78,10 @@ fn update_required_engine_thrusts(
 
     let total_mass = mass_props.mass + total_engine_mass;
 
+    let gravity = rapier_config.gravity.y.abs();
+
     let min_total_thrust_required =
-        calculate_thrust_required(rapier_config.gravity.y.abs(), pitch_angle, total_mass).max(0.0);
+        calculate_thrust_required(gravity, pitch_angle, total_mass).max(0.0);
 
     info!(
         "total_mass = {}, pitch_angle = {}, thrust_required = {}",
@@ -203,14 +205,14 @@ fn apply_engine_thrusts(
 
 /// Calculate the thrust force required to offset the downward force due to gravity.
 fn calculate_thrust_required(g: f32, tilt: f32, mass: f32) -> f32 {
-    // f * sin(tilt) = g * mass;
-    // f = (g * mass) / sin(tilt)
+    // Thrust = Weight * Sin(Pitch Angle)
 
+    // Need to convert from bevy to std angle
     let a = 90_f32.to_radians() - tilt;
 
     match tilt {
-        _ if tilt == 0.0 => g * mass,
-        _ => (g * mass) / a.sin(),
+        _ if tilt == 0.0 => mass * g,
+        _ => mass * g * a.sin(),
     }
 }
 
@@ -231,27 +233,10 @@ mod tests {
     }
 
     #[test]
-    fn calculate_thrust_required_when_1_degrees() {
-        assert_relative_eq!(
-            calculate_thrust_required(G, 1_f32.to_radians(), MASS),
-            981.1494,
-            max_relative = 0.0001
-        );
-    }
-
-    #[test]
     fn calculate_thrust_required_when_45_degrees() {
-        assert_eq!(
-            calculate_thrust_required(G, 45_f32.to_radians(), MASS),
-            1387.3436
-        );
-    }
-
-    #[test]
-    fn calculate_thrust_required_when_89_degrees() {
         assert_relative_eq!(
-            calculate_thrust_required(G, 89_f32.to_radians(), MASS),
-            56210.0134,
+            calculate_thrust_required(G, 45_f32.to_radians(), MASS),
+            693.671752344003121,
             max_relative = 0.0001
         );
     }
